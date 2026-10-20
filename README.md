@@ -2,7 +2,7 @@
 
 A 20-point SQL quiz built for Week 7. Students sign in with Supabase Auth, write SQL against a hosted PostgreSQL café dataset, run queries, inspect live result tables, and save their answers.
 
-**Quiz site:** deployment in progress; the verified production URL will be recorded here after publishing.
+**Quiz site:** https://campus-cafe-sql-quiz.vercel.app/
 
 **Repository:** https://github.com/Jacey-Dai/campus-cafe-sql-quiz
 
