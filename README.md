@@ -106,5 +106,3 @@ Add these server environment variables: `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KE
 - [Supabase database connections](https://supabase.com/docs/guides/database/connecting-to-postgres)
 - [Psycopg transactions](https://www.psycopg.org/psycopg3/docs/basic/transactions.html)
 - [Flask on Vercel](https://vercel.com/docs/frameworks/backend/flask)
-
-AI assistance was used to implement and test this project. Review the code and be prepared to explain its authentication, database roles, parameter binding, and Actions workflow.
