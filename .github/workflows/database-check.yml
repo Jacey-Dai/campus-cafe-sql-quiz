@@ -1,0 +1,33 @@
+name: Live PostgreSQL quiz check
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      PGHOST: aws-0-us-east-1.pooler.supabase.com
+      PGPORT: '5432'
+      PGDATABASE: postgres
+      PGUSER: postgres.rzihuwropluhsqggitam
+      SUPABASE_URL: https://rzihuwropluhsqggitam.supabase.co
+      SUPABASE_PUBLISHABLE_KEY: sb_publishable_rvOu7LorP-TFUaY6iERk5g_lqq0O3xV
+      PGPASSWORD: ${{ secrets.PGPASSWORD }}
+      PGSSLMODE: require
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+      - run: pip install -r requirements.txt
+      - name: Require repository secret
+        run: test -n "$PGPASSWORD"
+      - name: Check authentication gates and query sandbox
+        run: python -m pytest -q
+      - name: Verify live result sets and audit integrity
+        run: python manage.py check

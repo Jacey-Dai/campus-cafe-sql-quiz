@@ -1,0 +1,35 @@
+"""Original quiz and deterministic answer key. All data is fictional."""
+QUESTIONS = [
+    dict(id=1, title="Find affordable drinks", points=4,
+         prompt="List the name and price of each Drink costing less than $5. Sort by price, then name (ascending).",
+         concept="SELECT · WHERE · ORDER BY",
+         sql="SELECT name, price FROM quiz_data.menu_items WHERE category = 'Drink' AND price < 5 ORDER BY price, name;",
+         columns=["name", "price"], rows=[["Tea", "2.50"], ["Coffee", "3.00"], ["Latte", "4.50"]]),
+    dict(id=2, title="Count orders by customer", points=4,
+         prompt="List every customer's name and order_count, including customers with no orders. Sort by customer name.",
+         concept="LEFT JOIN · COUNT · GROUP BY",
+         sql="SELECT c.name, COUNT(o.id) AS order_count FROM quiz_data.customers c LEFT JOIN quiz_data.orders o ON o.customer_id = c.id GROUP BY c.id, c.name ORDER BY c.name;",
+         columns=["name", "order_count"], rows=[["Alex", 2], ["Blair", 2], ["Casey", 1], ["Drew", 1], ["Emery", 0]]),
+    dict(id=3, title="Calculate category revenue", points=4,
+         prompt="Calculate revenue for each menu category from all order items. Use quantity × unit_price (the sale price), not today's menu price. Name the total revenue and sort by category.",
+         concept="JOIN · SUM · historical sale prices",
+         sql="SELECT m.category, SUM(i.quantity * i.unit_price) AS revenue FROM quiz_data.order_items i JOIN quiz_data.menu_items m ON m.id = i.menu_item_id GROUP BY m.category ORDER BY m.category;",
+         columns=["category", "revenue"], rows=[["Drink", "26.00"], ["Food", "48.00"]]),
+    dict(id=4, title="Spot repeat favorites", points=4,
+         prompt="List menu item names and total_units for items with at least 3 units sold. Sort by total_units descending, then name ascending.",
+         concept="GROUP BY · HAVING · SUM",
+         sql="SELECT m.name, SUM(i.quantity) AS total_units FROM quiz_data.order_items i JOIN quiz_data.menu_items m ON m.id = i.menu_item_id GROUP BY m.id, m.name HAVING SUM(i.quantity) >= 3 ORDER BY total_units DESC, m.name;",
+         columns=["name", "total_units"], rows=[["Coffee", 4], ["Sandwich", 3]]),
+    dict(id=5, title="Find customers to invite back", points=4,
+         prompt="Find customers who have never placed an order. Return their names in alphabetical order.",
+         concept="NOT EXISTS · correlated subquery",
+         sql="SELECT c.name FROM quiz_data.customers c WHERE NOT EXISTS (SELECT 1 FROM quiz_data.orders o WHERE o.customer_id = c.id) ORDER BY c.name;",
+         columns=["name"], rows=[["Emery"]]),
+]
+
+SCHEMA = {
+    "customers": "id integer PK, name text",
+    "menu_items": "id integer PK, name text, category text, price numeric(8,2)",
+    "orders": "id integer PK, customer_id integer FK → customers.id, ordered_at date",
+    "order_items": "id integer PK, order_id integer FK → orders.id, menu_item_id integer FK → menu_items.id, quantity integer, unit_price numeric(8,2)",
+}

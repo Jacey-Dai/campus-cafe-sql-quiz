@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Campus Café · SQL Studio</title>
+  <meta name="description" content="A five-question, 20-point SQL quiz against a live campus café database.">
+  <link rel="stylesheet" href="/static/style.css">
+  <script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.108.2/dist/umd/supabase.js"></script>
+  <script defer src="/static/app.js"></script>
+</head>
+<body>
+  <header class="topbar"><a href="/" class="brand"><span class="brand-icon">c<span>·</span></span> campus café <span class="brand-divider">/</span> <span class="studio">SQL Studio</span></a><div class="account"><span id="identity">Guest session</span><button id="auth-toggle" class="button small">Sign in</button></div></header>
+  <main>
+    <section class="intro"><div><p class="eyebrow">THE PRACTICE COUNTER / WEEK 07</p><h1>A little SQL.<br>A lot of discovery.</h1><p class="lede">Explore the café, one query at a time. Five questions,<br class="desktop"> real database results, and room to experiment.</p></div><div class="quiz-summary"><span class="coffee-art" aria-hidden="true">☕</span><div><strong>20<span>points</span></strong><p>5 questions · 4 points each</p><div class="summary-tags"><span>PostgreSQL</span><span>Live data</span></div></div></div></section>
+    <section id="auth-panel" class="auth-panel" hidden aria-labelledby="auth-title"><div><p class="eyebrow">YOUR SEAT AT THE COUNTER</p><h2 id="auth-title">Sign in to run & save.</h2><p>We’ll email you a secure sign-in link. New visitors can use the same form.</p></div><form id="auth-form"><label for="email">Email address</label><div class="email-row"><input id="email" type="email" autocomplete="email" placeholder="you@university.edu" required><button class="button primary" id="email-button">Email sign-in link</button></div><p id="auth-message" role="status"></p></form></section>
+    <div class="workspace"><aside class="sidebar"><div class="section-heading"><h2>Your quiz</h2><span id="saved-count">0 / 5 saved</span></div><nav id="question-nav" aria-label="Quiz questions"></nav><section class="schema-panel"><p class="eyebrow">DATABASE MAP</p><h2>Meet the tables</h2><p class="muted">All tables live in <code>quiz_data</code>. The café and its customers are fictional.</p><div id="schema"></div><p class="tiny">Relationships: customers → orders → order_items ← menu_items</p></section></aside>
+      <section class="question-area" aria-label="SQL workspace"><article class="question-card"><div class="question-meta"><span id="question-number">QUESTION 01</span><span class="point-badge">4 POINTS</span></div><h2 id="question-title">Loading your quiz…</h2><p id="question-prompt"></p><p id="question-concept" class="concept"></p><div class="editor-heading"><label for="query">Your SQL</label><span>Read-only · 200 rows max</span></div><div class="editor"><div class="line-numbers" aria-hidden="true">1<br>2<br>3<br>4<br>5<br>6<br>7<br>8</div><textarea id="query" spellcheck="false" autocapitalize="off" autocomplete="off" aria-describedby="query-help" placeholder="SELECT ...\nFROM quiz_data.menu_items;"></textarea></div><div class="editor-footer"><span id="query-help">Sign in to run queries and save your progress.</span><div><button id="save" class="button" disabled>Save answer</button><button id="run" class="button primary" disabled><span aria-hidden="true">▶</span> Run query</button></div></div><p id="status" class="status" role="status" aria-live="polite"></p></article>
+      <section class="result-card" aria-labelledby="results-title"><div class="section-heading"><h2 id="results-title">Query results</h2><span id="result-meta">Ready when you are</span></div><div id="results" class="results empty"><span class="result-symbol" aria-hidden="true">▤</span><h3>Your next discovery starts here.</h3><p>Write a query, hit Run, and explore the rows.</p></div></section>
+      <details class="hint-card" id="hint"><summary><span>Need a little nudge?</span><span class="muted">Expected SQL + result <span aria-hidden="true">＋</span></span></summary><div class="hint-content"><p>One possible answer is shown below. Equivalent SQL is welcome; compare the returned values and requested order.</p><pre id="expected-sql"></pre><button id="use-hint" class="button small">Copy example to editor</button><h3>Expected result</h3><div id="expected-result" class="results"></div></div></details>
+      <div class="question-pager"><button id="previous" class="text-button">← Previous question</button><button id="next" class="text-button">Next question →</button></div>
+      </section></div>
+    <footer><span>Campus Café · SQL Studio</span><span>Built for curiosity. Powered by PostgreSQL & Supabase.</span></footer>
+  </main>
+</body>
+</html>
