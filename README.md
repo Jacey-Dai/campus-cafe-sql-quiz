@@ -6,6 +6,60 @@ A 20-point SQL quiz built for Week 7. Students sign in with Supabase Auth, write
 
 **Repository:** https://github.com/Jacey-Dai/campus-cafe-sql-quiz
 
+## Week 8: RAG-powered Text-to-SQL
+
+The existing Week 7 quiz now includes **Your AI SQL assistant**. Sign in, select a quiz question, enter a natural-language question, and click **Generate SQL**. The optional checkbox runs generated SQL in the existing read-only sandbox and compares its result against the selected quiz answer. SQL is also loaded into the manual editor for inspection, editing, and saving.
+
+### RAG architecture
+
+1. **Live PostgreSQL metadata:** `rag.knowledge()` reads table and column metadata from `information_schema.columns` in the same Week 7 Supabase database. It combines four table descriptions, four relationship/business-rule documents, and five worked question/SQL examples: **13 documents**.
+2. **Embeddings:** deterministic 512-dimensional normalized hashed TF-IDF word/bigram features are computed for the corpus and query. These are lightweight lexical embeddings, not pretrained neural semantic embeddings; English quiz phrasing works best.
+3. **Actual vector database retrieval:** ChromaDB 1.5.9 stores those vectors, documents, and metadata. `collection.query(query_embeddings=..., n_results=6)` performs cosine nearest-neighbor search. The site displays the six returned source IDs, documents, distances, and retrieval timing.
+4. **AI generation:** the server sends **only the retrieved context** plus the question to an OpenAI-compatible Chat Completions API. The provider, base URL, and model are server environment settings. Duke AI Gateway is the intended provider; live provider connectivity and model selection still require verification.
+5. **Optional execution and validation:** model output is independently checked by the PostgreSQL AST sandbox before it can run. The app displays live rows and compares values in requested row/column order with `quiz.py`. It ignores aliases and numeric formatting, preserves duplicates and NULLs, and never marks truncated results correct. A custom question may have a valid result but differ from the selected quiz answer; validation explicitly states its scope.
+
+The flow is **question → Chroma vector retrieval → AI API → generated SQL → optional read-only PostgreSQL execution → answer comparison**. It does not return a canned reference query as a fallback if the AI call fails. Retrieval evidence remains separate from expected-answer hints.
+
+### Serverless vector storage
+
+A real in-memory Chroma collection is lazily initialized once per server process. Its source corpus is versioned in code plus live schema metadata, so a cold start safely rebuilds it. It is a small reproducible assignment index, not durable user-upload storage. It uses explicit query/document embeddings with `embedding_function=None`; no model weights are downloaded. Temporary runtime paths use the writable temp directory. For a larger production system, use a persistent external Chroma service.
+
+### Configure Week 8
+
+Preserve the existing database and Supabase Auth environment variables. Add these to local `.env` and **Vercel → Project Settings → Environment Variables**, then redeploy:
+
+| Variable | Purpose |
+|---|---|
+| `AI_API_KEY` | Your provider API credential; server-side only |
+| `AI_BASE_URL` | Provider's HTTPS OpenAI-compatible API base, including `/v1` |
+| `AI_MODEL` | Exact model ID available to that key |
+| `AI_DAILY_LIMIT` | Shared limit per rolling 24 hours; default 100 |
+
+For Duke, verify the current endpoint/model in your AI Gateway dashboard; older documentation lists `https://litellm.oit.duke.edu/v1`, but do not assume that endpoint is reachable from Vercel. A network-restricted endpoint requires an externally accessible provider or compatible hosting network.
+
+```bash
+pip install -r requirements.txt
+python manage.py rag-setup
+python manage.py rag-check
+python -m pytest -q
+python app.py
+```
+
+`rag-setup` adds a private usage-counter table. Each signed-in user is limited to 5 AI requests/minute and 30/24 hours, with a shared daily limit; reservations use a PostgreSQL advisory lock to enforce concurrent limits. Failed attempts also consume a reservation. No API keys or prompts are stored in this table. The base quiz still runs if the AI provider is not configured.
+
+The Vercel function allows 60 seconds. Unused ONNX inference and Kubernetes packages are excluded from the function bundle because this application uses custom lexical vectors and embedded Chroma, not those integrations.
+
+### Verification and required screenshots
+
+- Verified locally: 39 tests; actual Chroma retrieval against the live PostgreSQL schema; all five reference questions retrieve their corresponding example within the top six.
+- Unit tests explicitly mock provider responses and do **not** establish real AI connectivity.
+- Pending: a successful real provider request, deployed end-to-end browser test, and the required screenshots. These must be completed before claiming the Week 8 submission is finished.
+- Required basic screenshot: natural-language question and genuinely AI-generated SQL.
+- Extra-credit screenshot: generated SQL, live result table, and validation outcome.
+- GitHub Actions also runs `manage.py rag-check` for real vector retrieval without needing an AI key.
+
+---
+
 ## Take the quiz
 
 1. Open the quiz site and click **Sign in**.
@@ -106,3 +160,4 @@ Add these server environment variables: `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KE
 - [Supabase database connections](https://supabase.com/docs/guides/database/connecting-to-postgres)
 - [Psycopg transactions](https://www.psycopg.org/psycopg3/docs/basic/transactions.html)
 - [Flask on Vercel](https://vercel.com/docs/frameworks/backend/flask)
+

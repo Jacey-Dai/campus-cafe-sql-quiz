@@ -21,4 +21,15 @@ if __name__=='__main__':
             conn.execute(Path(__file__).with_name('sql').joinpath('setup.sql').read_text())
         print('Quiz schemas and fictional data installed.')
     elif sys.argv[1:] == ['check']: check()
-    else: raise SystemExit('Usage: python manage.py setup|check')
+    elif sys.argv[1:] == ['rag-setup']:
+        with db.connect() as conn:
+            conn.execute(Path(__file__).with_name('sql').joinpath('rag.sql').read_text())
+        print('RAG usage limits installed.')
+    elif sys.argv[1:] == ['rag-check']:
+        import rag
+        for q in QUESTIONS:
+            sources,count=rag.retrieve(q['prompt'])
+            assert sources and count>=9
+            assert any(s['id']==f'example-{q["id"]}' for s in sources), f'Question {q["id"]} example not retrieved'
+            print('PASS Chroma retrieval:',q['title'],[s['id'] for s in sources])
+    else: raise SystemExit('Usage: python manage.py setup|check|rag-setup|rag-check')

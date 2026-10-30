@@ -14,7 +14,7 @@ function table(target,columns,rows){
 function status(message,error=false){text('status',message);$('status').classList.toggle('error',error);}
 function controls(){
   $('run').disabled=busy||!session; $('save').disabled=busy||!session;
-  $('query').disabled=busy;
+  $('query').disabled=busy; $('generate').disabled=busy||!session; $('rag-question').disabled=busy;
   text('auth-toggle',session?'Sign out':'Sign in');
   text('identity',session?.user?.email||'Guest session');
   text('query-help',session?'Your drafts save to your account. Ctrl/⌘ + Enter to run.':'Sign in to run queries and save your progress.');
@@ -29,13 +29,14 @@ function nav(){
     const copy=document.createElement('span'),title=document.createElement('span'),points=document.createElement('span');
     title.className='nav-title';title.textContent=q.title; points.className='nav-points';points.textContent='4 points';copy.append(title,points);b.append(n,copy);
     if(saved[q.id]){const dot=document.createElement('span');dot.className='saved-dot';dot.textContent='✓';b.append(dot);}
-    b.onclick=()=>show(i);$('question-nav').append(b);
+    b.disabled=busy;b.onclick=()=>show(i);$('question-nav').append(b);
   });
   text('saved-count',`${Object.keys(saved).length} / 5 saved`);
 }
 function show(i){
   if(questions[current])drafts[questions[current].id]=$('query').value;
   current=i;const q=questions[i];
+  $('rag-question').value=q.prompt; $('rag-output').hidden=true; text('rag-status','');
   text('question-number',`QUESTION ${String(q.id).padStart(2,'0')}`);text('question-title',q.title);text('question-prompt',q.prompt);text('question-concept',q.concept);
   $('query').value=drafts[q.id]??saved[q.id]??'';
   text('expected-sql',q.sql);table($('expected-result'),q.columns,q.rows);$('hint').open=false;
@@ -43,7 +44,7 @@ function show(i){
   const title=document.createElement('h3');title.textContent='Your next discovery starts here.';
   const p=document.createElement('p');p.textContent='Write a query, hit Run, and explore the rows.';$('results').append(title,p);
   text('result-meta','Ready when you are');status('');
-  $('previous').disabled=i===0;$('next').disabled=i===questions.length-1;
+  $('previous').disabled=i===0||busy;$('next').disabled=i===questions.length-1||busy;
   nav();controls();
 }
 async function api(path,options={}){
@@ -69,6 +70,7 @@ async function authChanged(next){
   if(previousUser!==next?.user?.id){drafts={};saved={};$('query').value='';}
   if(session){
     $('auth-panel').hidden=true;
+    if(previousUser===next.user.id)return;
     try{const data=await api('/api/answers');saved=data.answers;drafts={...saved};$('query').value=drafts[questions[current].id]??'';nav();status('Signed in. Your saved answers are ready.');}
     catch(e){status(e.message,true);}
   }else{saved={};nav();}
@@ -91,10 +93,33 @@ async function init(){
       try{const {error}=await client.auth.signInWithOtp({email:$('email').value.trim(),options:{emailRedirectTo:location.origin+'/'}});if(error)throw error;text('auth-message','Check your inbox (and spam) and open the sign-in link on this device.');}
       catch(e){text('auth-message',e.message);$('auth-message').classList.add('error');}finally{$('email-button').disabled=false;}
     };
-    $('run').onclick=()=>action('run');$('save').onclick=()=>action('save');
+    $('run').onclick=()=>action('run');$('save').onclick=()=>action('save');$('generate').onclick=generateSQL;
     $('previous').onclick=()=>show(current-1);$('next').onclick=()=>show(current+1);
     $('use-hint').onclick=()=>{$('query').value=questions[current].sql;drafts[questions[current].id]=$('query').value;status('Example loaded. Run it to see live rows.');$('query').focus();};
     $('query').addEventListener('keydown',e=>{if((e.ctrlKey||e.metaKey)&&e.key==='Enter'){e.preventDefault();action('run');}});
   }catch(e){status(e.message,true);}
+}
+async function generateSQL(){
+  if(busy||!session)return;
+  const question=$('rag-question').value.trim(),q=questions[current];
+  if(question.length<5){text('rag-status','Enter a question of at least 5 characters.');return;}
+  busy=true;controls();nav();$('previous').disabled=true;$('next').disabled=true;
+  $('rag-output').hidden=true;text('rag-status','Retrieving café knowledge from ChromaDB, then asking the AI…');$('rag-status').classList.remove('error');
+  try{
+    const data=await api('/api/generate',{method:'POST',body:JSON.stringify({question,question_id:q.id,execute:$('rag-execute').checked})});
+    if(questions[current].id!==q.id)return;
+    text('rag-sql',data.sql);text('rag-model',data.model);$('query').value=data.sql;drafts[q.id]=data.sql;
+    text('retrieval-summary',`Retrieved knowledge · ${data.sources.length} matches from ${data.retrieval.documents} documents`);
+    text('rag-retrieval-meta',`${data.retrieval.database} · ${data.retrieval.metric} distance (lower is closer) · ${data.retrieval.embedding} · retrieval ${data.retrieval.latency_ms}ms`);
+    $('rag-sources').replaceChildren();
+    data.sources.forEach((s,i)=>{const a=document.createElement('article');a.className='source-item';const h=document.createElement('h4'),m=document.createElement('small'),p=document.createElement('p');h.textContent=`${i+1}. ${s.title}`;m.textContent=`${s.id} · ${s.kind} · distance ${s.distance}`;p.textContent=s.text;a.append(h,m,p);$('rag-sources').append(a);});
+    $('rag-validation').className='';
+    if(data.execution){table($('results'),data.execution.columns,data.execution.rows);text('result-meta',`${data.execution.rows.length} rows · read-only live PostgreSQL`);}
+    else{table($('results'),[],[]);text('result-meta','No automatic execution');}
+    if(data.validation){const ok=data.validation.correct; text('rag-validation',ok?'✓ Correct: the live result matches this quiz question.':'Result differs from this quiz answer. Review the SQL, requested order, and selected question.');$('rag-validation').className=ok?'correct':'incorrect';}
+    else text('rag-validation',data.execution_error||'SQL generated. Automatic execution is off; click Run query to try it.');
+    $('rag-output').hidden=false;text('rag-status',`Generated from retrieved context in ${(data.latency_ms/1000).toFixed(1)}s. SQL is also loaded in the editor below.`);
+  }catch(e){text('rag-status',e.message);$('rag-status').classList.add('error');}
+  finally{busy=false;controls();nav();$('previous').disabled=current===0;$('next').disabled=current===questions.length-1;}
 }
 init();

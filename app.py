@@ -5,6 +5,7 @@ from flask import Flask, jsonify, render_template, request, g
 import requests
 import psycopg
 import db
+import rag
 from quiz import QUESTIONS, SCHEMA
 
 app = Flask(__name__, static_folder='public/static', static_url_path='/static')
@@ -77,6 +78,27 @@ def save():
 
 @app.get('/api/health')
 def health(): return jsonify(status='ok')
+
+@app.post('/api/generate')
+@authenticated
+def generate_sql():
+    value=request.get_json(silent=True) or {}
+    question=value.get('question')
+    question_id=value.get('question_id')
+    execute=value.get('execute',False)
+    if not isinstance(question,str) or not 5<=len(question.strip())<=1500:
+        raise ValueError('Enter a natural-language question between 5 and 1,500 characters.')
+    if type(question_id) is not int or question_id not in {q['id'] for q in QUESTIONS}:
+        raise ValueError('Choose a valid quiz question for comparison.')
+    if type(execute) is not bool:raise ValueError('Execute must be true or false.')
+    if not os.getenv('AI_API_KEY') or not os.getenv('AI_MODEL'):
+        return jsonify(error='AI generation is not configured. Contact the quiz owner.'),503
+    if not db.reserve_ai_request(g.user_id):
+        return jsonify(error='AI usage limit reached. Limit: 5 requests per minute, 30 per user per day, and a shared daily budget.'),429
+    return jsonify(rag.pipeline(question.strip(),question_id,execute,g.user_id))
+
+@app.errorhandler(rag.RAGError)
+def ai_error(error):return jsonify(error=str(error)),502
 
 @app.errorhandler(ValueError)
 def bad_query(error): return jsonify(error=str(error)), 400

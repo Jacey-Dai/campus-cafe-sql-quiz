@@ -31,3 +31,5 @@ jobs:
         run: python -m pytest -q
       - name: Verify live result sets and audit integrity
         run: python manage.py check
+      - name: Verify actual Chroma vector retrieval against live schema
+        run: python manage.py rag-check

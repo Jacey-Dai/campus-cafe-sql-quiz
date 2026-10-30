@@ -103,3 +103,13 @@ def answers(user_id):
     with connect() as conn:
         rows = conn.execute('SELECT question_id,query FROM quiz_private.answers WHERE user_id=%s', (user_id,)).fetchall()
         return {str(q): sql for q, sql in rows}
+
+def reserve_ai_request(user_id):
+    with connect() as conn:
+        # Serialize quota reservations so concurrent requests cannot overspend it.
+        conn.execute('SELECT pg_advisory_xact_lock(83170608)')
+        total,user_day,user_min=conn.execute("SELECT COUNT(*), COUNT(*) FILTER (WHERE user_id=%s), COUNT(*) FILTER (WHERE user_id=%s AND created_at>now()-interval '1 minute') FROM quiz_private.rag_requests WHERE created_at>now()-interval '24 hours'",(user_id,user_id)).fetchone()
+        if total>=int(os.getenv('AI_DAILY_LIMIT','100')) or user_day>=30 or user_min>=5:
+            return False
+        conn.execute('INSERT INTO quiz_private.rag_requests(user_id) VALUES (%s)',(user_id,))
+        return True
