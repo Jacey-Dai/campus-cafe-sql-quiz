@@ -91,7 +91,7 @@ def generate_sql():
     if type(question_id) is not int or question_id not in {q['id'] for q in QUESTIONS}:
         raise ValueError('Choose a valid quiz question for comparison.')
     if type(execute) is not bool:raise ValueError('Execute must be true or false.')
-    if not os.getenv('AI_API_KEY') or not os.getenv('AI_MODEL'):
+    if not os.getenv('AI_API_KEY'):
         return jsonify(error='AI generation is not configured. Contact the quiz owner.'),503
     if not db.reserve_ai_request(g.user_id):
         return jsonify(error='AI usage limit reached. Limit: 5 requests per minute, 30 per user per day, and a shared daily budget.'),429

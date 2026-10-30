@@ -19,6 +19,7 @@ from quiz import QUESTIONS
 
 _lock = threading.Lock()
 _index = None
+_model = None
 DIMENSIONS = 512
 STOP = set('a an the of to in is are for and or with by from which what how show list each all me their that have has who'.split())
 
@@ -84,12 +85,29 @@ def retrieve(question, top_k=6):
         sources.append(dict(id=ident,title=metadata['title'],kind=metadata['kind'],text=document,distance=round(float(distance),5)))
     return sources,count
 
+def configured_model(base, key):
+    global _model
+    explicit=os.getenv('AI_MODEL','').strip()
+    if explicit:return explicit
+    if _model:return _model
+    try:
+        response=requests.get(base+'/models',headers={'Authorization':'Bearer '+key},timeout=(5,8))
+        if response.status_code!=200:raise RAGError('Could not list AI models. Set AI_MODEL to an available chat model in Vercel.')
+        names=[item['id'] for item in response.json().get('data',[]) if isinstance(item.get('id'),str)]
+        names=[n for n in names if not any(x in n.lower() for x in ('embed','whisper','dall-e','tts','rerank','image','audio','vision-only'))]
+        if not names:raise RAGError('No chat models were returned by the AI provider. Set AI_MODEL explicitly.')
+        # Prefer smaller chat models for this bounded SQL generation task.
+        _model=min(names,key=lambda n:(0 if any(x in n.lower() for x in ('mini','flash','haiku','mistral')) else 1,n))
+        return _model
+    except (requests.RequestException,ValueError,KeyError,TypeError):
+        raise RAGError('Cannot reach the AI model-list endpoint. Check AI_BASE_URL and network access, or set AI_MODEL explicitly.') from None
+
 def generate(question, sources):
     key=os.getenv('AI_API_KEY','').strip()
     base=os.getenv('AI_BASE_URL','https://litellm.oit.duke.edu/v1').rstrip('/')
-    model=os.getenv('AI_MODEL','').strip()
-    if not key or not model: raise RAGError('AI generation is not configured. The owner must set AI_API_KEY and AI_MODEL in the server environment.')
+    if not key: raise RAGError('AI generation is not configured. The owner must set AI_API_KEY in the server environment.')
     if not base.startswith('https://'): raise RAGError('The AI endpoint must use HTTPS.')
+    model=configured_model(base,key)
     context='\n\n'.join(f'[{s["id"]}] {s["text"]}' for s in sources)
     system=('You are a PostgreSQL teaching assistant for a fictional campus cafe. '
       'Write exactly one read-only SELECT query that answers the question. Use only quiz_data tables. '

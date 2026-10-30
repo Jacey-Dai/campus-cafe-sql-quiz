@@ -68,3 +68,10 @@ def test_real_chroma_vector_search_with_fixture_documents(monkeypatch):
     assert count==3
     assert result[0]['id']=='fixture-customers'
     assert result[0]['distance']<result[1]['distance']
+
+def test_model_autodetection_uses_real_provider_list(monkeypatch):
+    monkeypatch.delenv('AI_MODEL',raising=False)
+    monkeypatch.setattr(rag,'_model',None)
+    reply=Mock(status_code=200,json=lambda:{'data':[{'id':'text-embedding-3-small'},{'id':'large-chat'},{'id':'chat-mini'}]})
+    with patch('rag.requests.get',return_value=reply):
+        assert rag.configured_model('https://gateway.example/v1','test-only')=='chat-mini'
