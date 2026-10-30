@@ -76,12 +76,19 @@ async function authChanged(next){
   }else{saved={};nav();}
 }
 async function init(){
+  const callbackError=new URLSearchParams(location.hash.slice(1)).get('error_code');
   try{
     const [config,quiz]=await Promise.all([fetch('/api/config').then(r=>r.json()),fetch('/api/quiz').then(r=>r.json())]);
     questions=quiz.questions;Object.entries(quiz.schema).forEach(([name,columns])=>{const d=document.createElement('details'),s=document.createElement('summary'),p=document.createElement('p');s.textContent=name;p.textContent=columns;d.append(s,p);$('schema').append(d);});
     show(0);
     if(!config.url||!config.key||!window.supabase)throw new Error('Sign-in configuration is unavailable. Contact the quiz owner.');
     client=window.supabase.createClient(config.url,config.key);
+    if(callbackError){
+      $('auth-panel').hidden=false;
+      const message=callbackError==='otp_expired'?'This sign-in link has expired or was already used. Request a new email below, then open only the newest link once.':'Sign-in could not be completed. Request a new sign-in email below.';
+      text('auth-message',message);$('auth-message').classList.add('error');status(message,true);
+      history.replaceState(null,'',location.pathname+location.search);
+    }
     // Avoid awaiting other Auth calls inside the SDK callback.
     client.auth.onAuthStateChange((_event,next)=>setTimeout(()=>authChanged(next),0));
     $('auth-toggle').onclick=async()=>{
